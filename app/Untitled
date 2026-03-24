@@ -1,0 +1,27 @@
+from fastapi import FastAPI
+from app.database import engine, Base
+import app.models.user
+import app.models.business
+import app.models.valuation
+import app.models.marketplace
+from app.routers import auth, business, valuation, marketplace
+
+Base.metadata.create_all(bind=engine)
+
+app = FastAPI(
+    title="ValueBridge API",
+    description="Business Valuation & Marketplace Platform for Nigerian SMEs",
+    version="1.0.0"
+)
+
+app.include_router(auth.router)
+app.include_router(business.router)
+app.include_router(valuation.router)
+app.include_router(marketplace.router)
+
+@app.get("/")
+def root():
+    return {
+        "message": "Welcome to ValueBridge API",
+        "status": "running"
+    }
