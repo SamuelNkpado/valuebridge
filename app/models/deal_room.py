@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, Boolean, Text, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Enum, Boolean, Text, JSON, Float
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database import Base
@@ -23,6 +23,7 @@ class DealRoom(Base):
     stage         = Column(Enum(DealStage), default=DealStage.interested)
     nda_acknowledged_seller   = Column(Boolean, default=False)
     nda_acknowledged_investor = Column(Boolean, default=False)
+    closed_amount = Column(Float, nullable=True)
     notes         = Column(Text, nullable=True)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     updated_at    = Column(DateTime(timezone=True), onupdate=func.now())

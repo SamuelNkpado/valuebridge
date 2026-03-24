@@ -70,6 +70,20 @@ def create_deal_room(
     db.refresh(deal_room)
     return deal_room
 
+# ── Get deal room by offer ID (for investor) ─────────
+@router.get("/by-offer/{offer_id}", response_model=DealRoomResponse)
+def get_deal_room_by_offer(
+    offer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    deal = db.query(DealRoom).filter(DealRoom.offer_id == offer_id).first()
+    if not deal:
+        raise HTTPException(status_code=404, detail="Deal room not found")
+    if current_user.id not in [deal.seller_id, deal.investor_id]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return deal
+
 # ── Get all my deal rooms ─────────────────────────────
 @router.get("/my-deals", response_model=List[DealRoomResponse])
 def get_my_deal_rooms(
@@ -116,21 +130,25 @@ def update_stage(
     if current_user.id not in [deal.seller_id, deal.investor_id]:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    deal.stage = data.stage
+    # ── NDA must be signed by both before progressing past nda_sent ──
+    stages_requiring_nda = ["due_diligence", "term_sheet", "closed"]
+    if data.stage in stages_requiring_nda:
+        if not deal.nda_acknowledged_seller or not deal.nda_acknowledged_investor:
+            raise HTTPException(
+                status_code=400,
+                detail="Both parties must acknowledge the NDA before proceeding"
+            )
 
-    # When deal is closed — automatically update business and listing
-    if data.stage == DealStage.closed:
+    deal.stage = data.stage
+    if data.closed_amount:
+        deal.closed_amount = data.closed_amount
+
+    if data.stage == "closed":
         from app.models.marketplace import Listing
         from app.models.business import Business, BusinessStatus
-
-        # Mark listing as closed
-        listing = db.query(Listing).filter(
-            Listing.id == deal.listing_id
-        ).first()
+        listing = db.query(Listing).filter(Listing.id == deal.listing_id).first()
         if listing:
             listing.status = "closed"
-
-            # Mark business as acquired
             business = db.query(Business).filter(
                 Business.id == listing.business_id
             ).first()

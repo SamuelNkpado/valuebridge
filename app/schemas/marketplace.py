@@ -46,24 +46,27 @@ class ListingUpdate(BaseModel):
 
 
 class ListingResponse(BaseModel):
-    id: int
-    business_id: int
-    owner_id: int
+    id:           int
+    business_id:  int
+    owner_id:     int
     asking_price: float
-    deal_type: DealType
-    visibility: ListingVisibility
-    status: ListingStatus
-    description: Optional[str]
-    created_at: datetime
+    deal_type:    DealType
+    visibility:   ListingVisibility
+    status:       ListingStatus
+    description:  Optional[str]
+    created_at:   datetime
 
-    business_name: Optional[str] = None
+    # Enriched public fields
+    business_name:     Optional[str] = None
     business_industry: Optional[str] = None
     business_location: Optional[str] = None
-    business_revenue: Optional[float] = None
+    business_revenue:  Optional[float] = None
     business_employees: Optional[int] = None
-    business_founded: Optional[int] = None
-    seller_initials: Optional[str] = None
-    seller_verified: Optional[bool] = None
+    business_founded:  Optional[int] = None
+    latest_valuation:  Optional[float] = None
+    seller_initials:   Optional[str] = None
+    seller_name:       Optional[str] = None
+    seller_verified:   Optional[bool] = None
 
     class Config:
         from_attributes = True
@@ -80,13 +83,14 @@ class OfferUpdate(BaseModel):
 
 
 class OfferResponse(BaseModel):
-    id: int
-    listing_id: int
+    id:          int
+    listing_id:  int
     investor_id: int
-    amount: float
-    message: Optional[str]
-    status: OfferStatus
-    created_at: datetime
+    amount:      float
+    message:     Optional[str]
+    status:      OfferStatus
+    created_at:  datetime
+    investor_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -99,13 +103,15 @@ class MessageCreate(BaseModel):
 
 
 class MessageResponse(BaseModel):
-    id: int
-    sender_id: int
+    id:          int
+    sender_id:   int
     receiver_id: int
-    listing_id: Optional[int]
-    content: str
-    is_read: bool
-    created_at: datetime
+    listing_id:  Optional[int]
+    content:     str
+    is_read:     bool
+    created_at:  datetime
+    sender_name:   Optional[str] = None
+    receiver_name: Optional[str] = None
 
     class Config:
         from_attributes = True

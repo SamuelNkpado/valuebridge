@@ -20,6 +20,7 @@ class DealRoomResponse(BaseModel):
     stage:       DealStage
     nda_acknowledged_seller:   bool
     nda_acknowledged_investor: bool
+    closed_amount: Optional[float] = None
     notes:       Optional[str]
     created_at:  datetime
 
@@ -28,6 +29,7 @@ class DealRoomResponse(BaseModel):
 
 class DealStageUpdate(BaseModel):
     stage: DealStage
+    closed_amount: Optional[float] = None
 
 class DealDocumentCreate(BaseModel):
     description: Optional[str] = None

@@ -35,7 +35,6 @@ DEFAULT_CHECKLIST = [
 
 
 def enrich_listing(listing: Listing, db: Session) -> dict:
-    """Add business name, seller initials to listing data"""
     data = {
         "id": listing.id,
         "business_id": listing.business_id,
@@ -52,26 +51,36 @@ def enrich_listing(listing: Listing, db: Session) -> dict:
         "business_revenue": None,
         "business_employees": None,
         "business_founded": None,
+        "latest_valuation": None,
         "seller_initials": None,
+        "seller_name": None,
         "seller_verified": None,
     }
 
-    # Get business info
-    business = db.query(Business).filter(Business.id == listing.business_id).first()
+    business = db.query(Business).filter(
+        Business.id == listing.business_id
+    ).first()
     if business:
-        data["business_name"] = business.name
-        data["business_industry"] = business.industry
-        data["business_location"] = business.location
-        data["business_revenue"] = business.annual_revenue
+        data["business_name"]      = business.name
+        data["business_industry"]  = business.industry
+        data["business_location"]  = business.location
+        data["business_revenue"]   = business.annual_revenue
         data["business_employees"] = business.employee_count
-        data["business_founded"] = business.founding_year
+        data["business_founded"]   = business.founding_year
 
-    # Get seller info (initials only for privacy)
+        # Get latest valuation for this business
+        from app.models.valuation import ValuationReport
+        latest = db.query(ValuationReport).filter(
+            ValuationReport.business_id == business.id
+        ).order_by(ValuationReport.created_at.desc()).first()
+        if latest:
+            data["latest_valuation"] = latest.estimated_value
+
     seller = db.query(User).filter(User.id == listing.owner_id).first()
     if seller:
         name_parts = seller.full_name.split()
-        initials = "".join([p[0].upper() for p in name_parts[:2]])
-        data["seller_initials"] = initials
+        data["seller_initials"] = "".join([p[0].upper() for p in name_parts[:2]])
+        data["seller_name"]     = seller.full_name
         data["seller_verified"] = seller.is_verified
 
     return data
@@ -198,11 +207,32 @@ def get_my_offers(
 
 @router.get("/offers/received", response_model=List[OfferResponse])
 def get_received_offers(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    listings = db.query(Listing).filter(Listing.owner_id == current_user.id).all()
+    listings = db.query(Listing).filter(
+        Listing.owner_id == current_user.id
+    ).all()
     listing_ids = [l.id for l in listings]
-    return db.query(Offer).filter(Offer.listing_id.in_(listing_ids)).all()
+    offers = db.query(Offer).filter(
+        Offer.listing_id.in_(listing_ids)
+    ).all()
+
+    result = []
+    for o in offers:
+        investor = db.query(User).filter(User.id == o.investor_id).first()
+        offer_dict = {
+            "id": o.id,
+            "listing_id": o.listing_id,
+            "investor_id": o.investor_id,
+            "amount": o.amount,
+            "message": o.message,
+            "status": o.status,
+            "created_at": o.created_at,
+            "investor_name": investor.full_name if investor else None,
+        }
+        result.append(offer_dict)
+    return result
 
 
 @router.put("/offers/{offer_id}", response_model=OfferResponse)
@@ -271,13 +301,27 @@ def send_message(
 
 @router.get("/messages", response_model=List[MessageResponse])
 def get_messages(
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
-    return (
-        db.query(Message)
-        .filter(
-            (Message.receiver_id == current_user.id)
-            | (Message.sender_id == current_user.id)
-        )
-        .all()
-    )
+    messages = db.query(Message).filter(
+        (Message.receiver_id == current_user.id) |
+        (Message.sender_id == current_user.id)
+    ).all()
+
+    result = []
+    for m in messages:
+        sender   = db.query(User).filter(User.id == m.sender_id).first()
+        receiver = db.query(User).filter(User.id == m.receiver_id).first()
+        result.append({
+            "id":          m.id,
+            "sender_id":   m.sender_id,
+            "receiver_id": m.receiver_id,
+            "listing_id":  m.listing_id,
+            "content":     m.content,
+            "is_read":     m.is_read,
+            "created_at":  m.created_at,
+            "sender_name":   sender.full_name   if sender   else f"User #{m.sender_id}",
+            "receiver_name": receiver.full_name if receiver else f"User #{m.receiver_id}",
+        })
+    return result
