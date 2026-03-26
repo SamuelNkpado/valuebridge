@@ -43,6 +43,7 @@ def enrich_listing(listing: Listing, db: Session) -> dict:
         "deal_type": listing.deal_type,
         "visibility": listing.visibility,
         "status": listing.status,
+        "share_token": listing.share_token,
         "description": listing.description,
         "created_at": listing.created_at,
         "business_name": None,
@@ -99,10 +100,29 @@ def create_listing(
     )
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")
-    listing = Listing(owner_id=current_user.id, **data.model_dump())
+
+    import secrets
+    share_token = secrets.token_urlsafe(16) if data.visibility != "public" else None
+
+    listing = Listing(owner_id=current_user.id, share_token=share_token, **data.model_dump())
     db.add(listing)
     db.commit()
     db.refresh(listing)
+    return enrich_listing(listing, db)
+
+
+@router.get("/listings/shared/{token}", response_model=ListingResponse)
+def get_listing_by_token(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    listing = db.query(Listing).filter(
+        Listing.share_token == token,
+        Listing.status == "active"
+    ).first()
+    if not listing:
+        raise HTTPException(status_code=404, detail="Listing not found or expired")
     return enrich_listing(listing, db)
 
 

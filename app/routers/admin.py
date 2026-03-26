@@ -7,6 +7,7 @@ from app.models.user import User, UserRole
 from app.models.business import Business
 from app.models.valuation import ValuationReport
 from app.models.marketplace import Listing, Offer
+from app.models.deal_room import DealRoom, DealStage
 from app.routers.business import get_current_user
 
 router = APIRouter(prefix="/admin", tags=["Admin Panel"])
@@ -60,6 +61,121 @@ def get_platform_stats(
             f"{(accepted_offers/total_offers*100):.1f}%" if total_offers > 0 else "0%"
         ),
     }
+
+
+@router.get("/dashboard")
+def get_admin_dashboard(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    from app.models.deal_room import DealRoom
+    from app.models.marketplace import Listing, Offer
+    from app.models.business import Business
+    from sqlalchemy import func as sqlfunc, text
+
+    total_users       = db.query(User).count()
+    sme_owners        = db.query(User).filter(User.role == "sme_owner").count()
+    investors         = db.query(User).filter(User.role == "investor").count()
+    advisors_total    = db.query(User).filter(User.role == "advisor").count()
+    advisors_verified = db.query(User).filter(
+        User.role == "advisor", User.is_verified == True
+    ).count()
+    advisors_pending  = advisors_total - advisors_verified
+
+    total_businesses    = db.query(Business).count()
+    active_businesses   = db.query(Business).filter(
+        Business.status == "active"
+    ).count()
+    acquired_businesses = db.query(Business).filter(
+        Business.status == "acquired"
+    ).count()
+
+    total_listings  = db.query(Listing).count()
+    active_listings = db.query(Listing).filter(Listing.status == "active").count()
+    closed_listings = db.query(Listing).filter(Listing.status == "closed").count()
+
+    total_offers    = db.query(Offer).count()
+    accepted_offers = db.query(Offer).filter(Offer.status == "accepted").count()
+    rejected_offers = db.query(Offer).filter(Offer.status == "rejected").count()
+
+    total_deals = db.query(DealRoom).count()
+
+    # Use raw text to avoid enum casting issues
+    closed_deals     = db.execute(
+        text("SELECT COUNT(*) FROM deal_rooms WHERE stage::text = 'closed'")
+    ).scalar() or 0
+    terminated_deals = db.execute(
+        text("SELECT COUNT(*) FROM deal_rooms WHERE stage::text = 'terminated'")
+    ).scalar() or 0
+    active_deals = total_deals - closed_deals - terminated_deals
+
+    closed_value = db.execute(
+        text("SELECT COALESCE(SUM(closed_amount), 0) FROM deal_rooms WHERE stage::text = 'closed'")
+    ).scalar() or 0
+
+    pending_advisors = db.query(User).filter(
+        User.role == "advisor",
+        User.is_verified == False
+    ).all()
+
+    return {
+        "users": {
+            "total":              total_users,
+            "sme_owners":         sme_owners,
+            "investors":          investors,
+            "advisors_total":     advisors_total,
+            "advisors_verified":  advisors_verified,
+            "advisors_pending":   advisors_pending,
+        },
+        "businesses": {
+            "total":    total_businesses,
+            "active":   active_businesses,
+            "acquired": acquired_businesses,
+        },
+        "listings": {
+            "total":  total_listings,
+            "active": active_listings,
+            "closed": closed_listings,
+        },
+        "offers": {
+            "total":        total_offers,
+            "accepted":     accepted_offers,
+            "rejected":     rejected_offers,
+            "success_rate": f"{(accepted_offers/total_offers*100):.1f}%" if total_offers > 0 else "0%",
+        },
+        "deals": {
+            "total":             total_deals,
+            "active":            active_deals,
+            "closed":            closed_deals,
+            "terminated":        terminated_deals,
+            "total_closed_value": closed_value,
+        },
+        "pending_advisors": [
+            {
+                "id":         a.id,
+                "full_name":  a.full_name,
+                "email":      a.email,
+                "created_at": str(a.created_at)
+            } for a in pending_advisors
+        ],
+    }
+
+
+@router.put("/advisors/{user_id}/verify")
+def verify_advisor(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin)
+):
+    user = db.query(User).filter(
+        User.id == user_id,
+        User.role == UserRole.advisor
+    ).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Advisor not found")
+    user.is_verified = True
+    db.commit()
+    return {"message": f"{user.full_name} verified successfully", "user_id": user.id}
 
 
 # Get all users

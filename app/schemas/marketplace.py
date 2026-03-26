@@ -53,6 +53,7 @@ class ListingResponse(BaseModel):
     deal_type:    DealType
     visibility:   ListingVisibility
     status:       ListingStatus
+    share_token:  Optional[str] = None
     description:  Optional[str]
     created_at:   datetime
 
