@@ -8,8 +8,10 @@ ValueBridge is a full-stack platform that helps Nigerian SME owners get professi
 - **Auth:** JWT tokens
 
 ## Live Demo
-- Frontend: [your Vercel URL]
-- API Docs: [your Render URL]/docs
+- Frontend: https://valuebridge-frontend.vercel.app/
+  
+- API Docs: https://valuebridge-api.onrender.com/docs
+  
 
 ## Local Setup — Backend
 
