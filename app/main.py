@@ -8,8 +8,6 @@ import app.models.marketplace
 import app.models.deal_room
 from app.routers import auth, business, valuation, marketplace, reporting, admin, deal_room
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(
     title="ValueBridge API",
     description="Business Valuation & Marketplace Platform for Nigerian SMEs",
@@ -23,6 +21,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def startup():
+    Base.metadata.create_all(bind=engine)
 
 app.include_router(auth.router)
 app.include_router(business.router)
